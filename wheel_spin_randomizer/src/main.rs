@@ -8,7 +8,7 @@ use std::io::{self, stdout, Write};
 use std::thread;
 use std::time::Duration;
 
-fn get_or_set_range(set_new: bool) -> Vec<i32> {
+fn get_or_set_range(set_new: bool) -> Vec<String> {
     let file_path = "range.txt";
 
     // Attempt to read numbers from the file if not setting a new range
@@ -17,76 +17,95 @@ fn get_or_set_range(set_new: bool) -> Vec<i32> {
             Ok(content) => {
                 if content.trim().is_empty() {
                     println!("The range file is empty. Using default range.");
-                    vec![10, -20, 30, -40, 50]
+                    vec![
+                        String::from("10"),
+                        String::from("-20"),
+                        String::from("30"),
+                        String::from("-40"),
+                        String::from("50"),
+                    ]
                 } else {
-                    // Parse the content as a list of numbers
-                    let numbers: Result<Vec<i32>, _> = content
+                    // Split the content as a list of strings
+                    content
                         .trim()
                         .split(',')
-                        .map(|num| num.parse::<i32>())
-                        .collect();
-                    numbers.unwrap_or_else(|_| {
-                        println!(
-                            "Failed to parse numbers from the range file. Using default range."
-                        );
-                        vec![10, -20, 30, -40, 50]
-                    })
+                        .map(|num| num.trim().to_string())
+                        .collect()
                 }
             }
             Err(_) => {
                 println!("Failed to read the range file. Using default range.");
-                vec![10, -20, 30, -40, 50]
+                vec![
+                    String::from("10"),
+                    String::from("-20"),
+                    String::from("30"),
+                    String::from("-40"),
+                    String::from("50"),
+                ]
             }
         };
     }
 
     // If setting a new range or file reading/parsing failed, prompt the user
     if set_new {
-        println!(
-            "Enter the numbers to randomize from, separated by commas (e.g., '-10,20,30,-5'): "
-        );
+        println!("Enter the strings to randomize from, separated by commas (e.g., 'a,b,c,d'): ");
         let mut input = String::new();
-        io::stdin()
-            .read_line(&mut input)
-            .expect("Failed to read line");
+        if let Err(e) = io::stdin().read_line(&mut input) {
+            eprintln!("Error reading line: {:?}", e);
+            std::process::exit(1);
+        }
 
-        let numbers: Result<Vec<i32>, _> = input
+        let numbers: Vec<String> = input
             .trim()
             .split(',')
-            .map(|num| num.parse::<i32>())
+            .map(|num| num.trim().to_string())
+            .filter(|num| !num.is_empty())
             .collect();
 
-        return match numbers {
-            Ok(nums) => {
-                // Save the array to the file for future use
-                let mut file = OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
-                    .open(file_path)
-                    .expect("Failed to open file");
+        if numbers.is_empty() {
+            println!("Invalid input. Using default range.");
+            return vec![
+                String::from("10"),
+                String::from("-20"),
+                String::from("30"),
+                String::from("-40"),
+                String::from("50"),
+            ];
+        }
 
-                writeln!(
-                    file,
-                    "{}",
-                    nums.iter()
-                        .map(|n| n.to_string())
-                        .collect::<Vec<_>>()
-                        .join(",")
-                )
-                .expect("Failed to write to file");
-
-                nums
-            }
-            Err(_) => {
-                println!("Invalid input. Using default range.");
-                vec![10, -20, 30, -40, 50]
+        // Save the array to the file for future use
+        let mut file = match OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(file_path)
+        {
+            Ok(file) => file,
+            Err(e) => {
+                eprintln!("Failed to open file: {e}");
+                std::process::exit(1);
             }
         };
+
+        match writeln!(file, "{}", numbers.join(",")) {
+            Ok(_) => {}
+            Err(e) => {
+                eprintln!("Failed to write to file: {}", e);
+                std::process::exit(1);
+            }
+        }
+
+        return numbers;
     }
 
     // Default fallback array
-    vec![10, -20, 30, -40, 50]
+    vec![
+        String::from("10"),
+        String::from("-20"),
+        String::from("30"),
+        String::from("-40"),
+        String::from("50"),
+    ]
 }
 
 fn main() {
@@ -101,7 +120,7 @@ fn main() {
                 println!("The range file is empty.");
             }
         }
-        Err(_) => println!("Failed to read the range file."),
+        Err(e) => println!("Failed to read the range file: {}.", e),
     }
 
     println!("Select an option:");
@@ -111,9 +130,10 @@ fn main() {
     stdout().flush().unwrap();
 
     let mut choice = String::new();
-    io::stdin()
-        .read_line(&mut choice)
-        .expect("Failed to read line");
+    if io::stdin().read_line(&mut choice).is_err() {
+        println!("Failed to read line from input.");
+        std::process::exit(1);
+    }
     let set_new = choice.trim() == "2";
 
     let numbers = get_or_set_range(set_new);
@@ -121,18 +141,22 @@ fn main() {
     let mut stdout = stdout();
 
     for i in 0..49 {
-        let value = numbers[rng.gen_range(0..numbers.len())];
-        execute!(
+        let value = &numbers[rng.gen_range(0..numbers.len())];
+        if execute!(
             stdout,
             SetForegroundColor(Color::Blue),
             Print(format!("Value: {}\n", value)),
             ResetColor
         )
-        .expect("Failed to execute command");
+        .is_err()
+        {
+            println!("Failed to execute terminal command.");
+            continue; // Decide whether to continue with the next iteration
+        }
         let delay = (50.0 + (450.0 * (i as f64 / 48.0).powf(2.0))) as u64; // Quadratic increase from 50ms to 500ms
         thread::sleep(Duration::from_millis(delay));
     }
-    let final_value = numbers[rng.gen_range(0..numbers.len())];
+    let final_value = &numbers[rng.gen_range(0..numbers.len())];
     execute!(
         stdout,
         SetForegroundColor(Color::Green),
@@ -142,5 +166,5 @@ fn main() {
     .expect("Failed to execute command");
 
     println!("Press Enter to close...");
-    io::stdin().read_line(&mut String::new()).unwrap(); // Wait for Enter key press
+    let _ = io::stdin().read_line(&mut String::new()); // Wait for Enter key press
 }
