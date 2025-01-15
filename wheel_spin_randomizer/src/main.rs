@@ -16,7 +16,13 @@ fn get_or_set_range(set_new: bool) -> Result<Vec<String>, Box<dyn Error>> {
 
     if !set_new {
         // Attempt to read numbers from the file
-        let content = read_to_string(file_path)?;
+        let content = match read_to_string(file_path) {
+            Ok(content) => content,
+            Err(e) => {
+                println!("Failed to read the range file: {}. Using default range.", e);
+                return Ok(DEFAULT_NUMBERS.iter().map(|s| s.to_string()).collect());
+            }
+        };
         return if content.trim().is_empty() {
             println!("The range file is empty. Using default range.");
             Ok(DEFAULT_NUMBERS.iter().map(|s| s.to_string()).collect())
