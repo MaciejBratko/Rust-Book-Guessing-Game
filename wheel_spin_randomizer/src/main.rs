@@ -8,52 +8,36 @@ use std::io::{self, stdout, Write};
 use std::thread;
 use std::time::Duration;
 
-fn get_or_set_range(set_new: bool) -> Vec<String> {
+fn get_or_set_range(set_new: bool) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let file_path = "range.txt";
 
     // Attempt to read numbers from the file if not setting a new range
     if !set_new {
-        return match read_to_string(file_path) {
-            Ok(content) => {
-                if content.trim().is_empty() {
-                    println!("The range file is empty. Using default range.");
-                    vec![
-                        String::from("10"),
-                        String::from("-20"),
-                        String::from("30"),
-                        String::from("-40"),
-                        String::from("50"),
-                    ]
-                } else {
-                    // Split the content as a list of strings
-                    content
-                        .trim()
-                        .split(',')
-                        .map(|num| num.trim().to_string())
-                        .collect()
-                }
-            }
-            Err(_) => {
-                println!("Failed to read the range file. Using default range.");
-                vec![
-                    String::from("10"),
-                    String::from("-20"),
-                    String::from("30"),
-                    String::from("-40"),
-                    String::from("50"),
-                ]
-            }
-        };
+        let content = read_to_string(file_path)?;
+        if content.trim().is_empty() {
+            println!("The range file is empty. Using default range.");
+            return Ok(vec![
+                String::from("10"),
+                String::from("-20"),
+                String::from("30"),
+                String::from("-40"),
+                String::from("50"),
+            ]);
+        } else {
+            // Split the content as a list of strings
+            return Ok(content
+                .trim()
+                .split(',')
+                .map(|num| num.trim().to_string())
+                .collect());
+        }
     }
 
     // If setting a new range or file reading/parsing failed, prompt the user
     if set_new {
         println!("Enter the strings to randomize from, separated by commas (e.g., 'a,b,c,d'): ");
         let mut input = String::new();
-        if let Err(e) = io::stdin().read_line(&mut input) {
-            eprintln!("Error reading line: {:?}", e);
-            std::process::exit(1);
-        }
+        io::stdin().read_line(&mut input)?;
 
         let numbers: Vec<String> = input
             .trim()
@@ -63,42 +47,32 @@ fn get_or_set_range(set_new: bool) -> Vec<String> {
             .collect();
 
         if numbers.is_empty() {
-            println!("Invalid input. Using default range.");
-            return vec![
-                String::from("10"),
-                String::from("-20"),
-                String::from("30"),
-                String::from("-40"),
-                String::from("50"),
-            ];
+            return Err("Invalid input. Using default range.".into());
         }
 
         // Save the array to the file for future use
-        let mut file = match OpenOptions::new()
+        let mut file = OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
-            .open(file_path)
-        {
-            Ok(file) => file,
-            Err(e) => {
-                eprintln!("Failed to open file: {e}");
-                std::process::exit(1);
-            }
-        };
+            .open(file_path)?;
 
-        match writeln!(file, "{}", numbers.join(",")) {
-            Ok(_) => {}
-            Err(e) => {
-                eprintln!("Failed to write to file: {}", e);
-                std::process::exit(1);
-            }
-        }
+        writeln!(file, "{}", numbers.join(","))?;
 
-        return numbers;
+        return Ok(numbers);
     }
 
     // Default fallback array
+    Ok(vec![
+        String::from("10"),
+        String::from("-20"),
+        String::from("30"),
+        String::from("-40"),
+        String::from("50"),
+    ])
+}
+
+fn default_numbers() -> Vec<String> {
     vec![
         String::from("10"),
         String::from("-20"),
@@ -136,7 +110,14 @@ fn main() {
     }
     let set_new = choice.trim() == "2";
 
-    let numbers = get_or_set_range(set_new);
+    let numbers = match get_or_set_range(set_new) {
+        Ok(nums) => nums,
+        Err(e) => {
+            println!("An error occurred: {}", e);
+            default_numbers()
+        }
+    };
+
     let mut rng = rand::thread_rng();
     let mut stdout = stdout();
 
