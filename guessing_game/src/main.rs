@@ -1,6 +1,6 @@
 use rand::Rng;
 use std::cmp::Ordering;
-use std::io::{self};
+use std::io::{self, Write};
 
 fn main() {
     let secret_number = rand::thread_rng().gen_range(1..=100);
@@ -10,7 +10,8 @@ fn main() {
     let mut win = false;
 
     while !win {
-        println!("Your guess: ");
+        print!("Your guess: ");
+        io::stdout().flush().unwrap();
 
         let mut guess = String::new();
 
@@ -29,10 +30,10 @@ fn main() {
         };
 
         match guess.cmp(&secret_number) {
-            Ordering::Less => println!("Too low! Try again!"),
-            Ordering::Greater => println!("Too high! Try again!"),
+            Ordering::Less => println!("Too low! Try again!\n"),
+            Ordering::Greater => println!("Too high! Try again!\n"),
             Ordering::Equal => {
-                println!("You win! It took you {} tries to guess the number!", tries);
+                println!("\nYou win! It took you {tries} tries to guess the number!");
                 win = true;
             }
         }
