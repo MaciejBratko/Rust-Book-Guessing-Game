@@ -1,36 +1,15 @@
-use rand::Rng;
-use std::cmp::Ordering;
-use std::io::{self, Write};
-
-fn get_user_guess() -> i32 {
-    let mut guess = String::new();
-    io::stdin()
-        .read_line(&mut guess)
-        .expect("Failed to fetch the line.");
-    guess.trim().parse().expect("Please enter a valid number!")
-}
+use std::io;
 
 fn main() {
-    let secret_number = rand::thread_rng().gen_range(1..=100);
-    let mut tries = 0;
     println!("Guess the number!");
 
-    loop {
-        print!("Your guess: ");
-        io::stdout().flush().unwrap();
+    println!("Please input your guess.");
 
-        tries += 1;
-        let guess = get_user_guess();
+    let mut guess = String::new();
 
-        match guess.cmp(&secret_number) {
-            Ordering::Less => println!("Too low! Try again!\n"),
-            Ordering::Greater => println!("Too high! Try again!\n"),
-            Ordering::Equal => {
-                println!("\nYou win! It took you {tries} tries to guess the number!");
-                break;
-            }
-        }
-    }
+    io::stdin()
+        .read_line(&mut guess)
+        .expect("Failed to read the line.");
 
-    println!("The secret number is: {}", secret_number);
+    println!("You guessed {}", guess)
 }
